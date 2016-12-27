@@ -4,6 +4,9 @@ import java.util.function.Function;
 import java.util.stream.DoubleStream;
 import java.util.stream.IntStream;
 
+import com.aparapi.Kernel;
+import com.aparapi.Range;
+
 public class Entropy{
 	private static final Integer SIZE = 5000000 * 3;
 
@@ -31,6 +34,14 @@ public class Entropy{
 			@Override
 			public Double apply( double[ ] probabilities ) {
 				return computeEntropyYeppp( probabilities );
+			}
+		} );
+		
+		System.out.println("\nAparapi implementation:");
+		compute( probabilities, new Function< double[ ], Double >(){
+			@Override
+			public Double apply( double[ ] probabilities ) {
+				return computeEntropyAparapi( probabilities );
 			}
 		} );
 	}
@@ -62,6 +73,22 @@ public class Entropy{
 			entropy -= p * Math.log( p );
 		}
 		return entropy;
+	}
+	
+	private static double computeEntropyAparapi(double[] probabilities) {
+		DoubleStream stream = DoubleStream.of(0);
+		Kernel kernel = new Kernel() {
+			@Override
+			public void run() {
+				int i = getGlobalId();
+				double p = probabilities[i];
+				double entropy = -(p * log(p));
+				DoubleStream.concat(stream, DoubleStream.of(entropy));
+			}
+		};
+		Range range = Range.create(probabilities.length);
+		kernel.execute(range);
+		return stream.sum();
 	}
 
 	private static double computeEntropyYeppp( final double[ ] probabilities ) {
